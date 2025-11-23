@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TechMonarchs - AI Image Upscaler</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { text-align: center; color: white; margin-bottom: 40px; }
+        .header h1 { font-size: 3em; margin-bottom: 10px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
+        .header p { font-size: 1.2em; opacity: 0.9; }
+        .card { background: white; border-radius: 20px; padding: 40px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); margin-bottom: 30px; }
+        .upload-area { border: 3px dashed #667eea; border-radius: 15px; padding: 60px 20px; text-align: center; cursor: pointer; transition: all 0.3s; background: #f8f9ff; }
+        .upload-area:hover { border-color: #764ba2; background: #f0f2ff; }
+        .upload-area.dragover { border-color: #764ba2; background: #e8ebff; transform: scale(1.02); }
+        .upload-icon { font-size: 4em; color: #667eea; margin-bottom: 20px; }
+        .upload-text { font-size: 1.3em; color: #333; margin-bottom: 10px; }
+        .upload-subtext { color: #666; font-size: 0.9em; }
+        input[type="file"] { display: none; }
+        .controls { margin-top: 30px; }
+        .control-group { margin-bottom: 25px; }
+        .control-group label { display: block; font-weight: 600; color: #333; margin-bottom: 10px; font-size: 1.1em; }
+        .slider-container { display: flex; align-items: center; gap: 15px; }
+        .slider { flex: 1; height: 8px; border-radius: 5px; background: #ddd; outline: none; -webkit-appearance: none; }
+        .slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 24px; height: 24px; border-radius: 50%; background: #667eea; cursor: pointer; }
+        .slider::-moz-range-thumb { width: 24px; height: 24px; border-radius: 50%; background: #667eea; cursor: pointer; border: none; }
+        .slider-value { font-weight: bold; color: #667eea; font-size: 1.2em; min-width: 40px; }
+        .checkbox-group { display: flex; align-items: center; gap: 10px; }
+        .checkbox-group input[type="checkbox"] { width: 20px; height: 20px; cursor: pointer; }
+        .btn { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 15px 40px; font-size: 1.1em; border-radius: 10px; cursor: pointer; transition: all 0.3s; font-weight: 600; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4); }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        .progress { display: none; margin-top: 20px; }
+        .progress-bar { width: 100%; height: 30px; background: #f0f0f0; border-radius: 15px; overflow: hidden; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); width: 0%; transition: width 0.3s; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; }
+        .results { display: none; }
+        .image-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
+        .image-box { text-align: center; }
+        .image-box img { max-width: 100%; border-radius: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+        .image-box h3 { margin-bottom: 15px; color: #333; }
+        .download-btn { margin-top: 20px; }
+        .error { background: #fee; border: 2px solid #fcc; color: #c33; padding: 15px; border-radius: 10px; margin-top: 20px; display: none; }
+        @media (max-width: 768px) {
+            .header h1 { font-size: 2em; }
+            .image-compare { grid-template-columns: 1fr; }
+            .card { padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>AIQUEUE ENHANCIFIER</h1>
+            <p>AI-Powered Image & Video Upscaling</p>
+        </div>
+
+        <div class="card">
+            <div class="upload-section">
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📸</div>
+                    <div class="upload-text">Click to upload or drag & drop</div>
+                    <div class="upload-subtext">Supports: PNG, JPG, JPEG, BMP, WEBP (Max 50MB)</div>
+                    <input type="file" id="fileInput" accept="image/*">
+                </div>
+
+                <div class="controls">
+                    <div class="control-group">
+                        <label>Fidelity Weight (0 = Better Quality, 1 = Better Fidelity)</label>
+                        <div class="slider-container">
+                            <input type="range" min="0" max="1" step="0.1" value="0.7" class="slider" id="fidelitySlider">
+                            <span class="slider-value" id="fidelityValue">0.7</span>
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="upscaleCheck" checked>
+                            <label for="upscaleCheck">Enable Background Upscaling (RealESRGAN)</label>
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="faceUpscaleCheck" checked>
+                            <label for="faceUpscaleCheck">Enable Face Upsampling</label>
+                        </div>
+                    </div>
+
+                    <button class="btn" id="processBtn" disabled>🚀 Process Image</button>
+                </div>
+
+                <div class="progress" id="progress">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill">Processing...</div>
+                    </div>
+                </div>
+
+                <div class="error" id="error"></div>
+            </div>
+        </div>
+
+        <div class="card results" id="results">
+            <h2 style="text-align: center; margin-bottom: 30px; color: #333;">✨ Results</h2>
+            <div class="image-compare">
+                <div class="image-box">
+                    <h3>Original</h3>
+                    <img id="originalImg" src="" alt="Original">
+                </div>
+                <div class="image-box">
+                    <h3>Enhanced</h3>
+                    <img id="resultImg" src="" alt="Enhanced">
+                </div>
+            </div>
+            <div style="text-align: center;">
+                <a class="btn download-btn" id="downloadBtn" download>⬇️ Download Enhanced Image</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const processBtn = document.getElementById('processBtn');
+        const fidelitySlider = document.getElementById('fidelitySlider');
+        const fidelityValue = document.getElementById('fidelityValue');
+        const progress = document.getElementById('progress');
+        const progressFill = document.getElementById('progressFill');
+        const results = document.getElementById('results');
+        const error = document.getElementById('error');
+        const originalImg = document.getElementById('originalImg');
+        const resultImg = document.getElementById('resultImg');
+        const downloadBtn = document.getElementById('downloadBtn');
+
+        let selectedFile = null;
+        let resultId = null;
+
+        fidelitySlider.addEventListener('input', (e) => {
+            fidelityValue.textContent = e.target.value;
+        });
+
+        uploadArea.addEventListener('click', () => fileInput.click());
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            selectedFile = file;
+            uploadArea.querySelector('.upload-text').textContent = `Selected: ${file.name}`;
+            processBtn.disabled = false;
+            results.style.display = 'none';
+            error.style.display = 'none';
+        }
+
+        processBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            formData.append('fidelity', fidelitySlider.value);
+            formData.append('upscale', document.getElementById('upscaleCheck').checked);
+            formData.append('face_upsample', document.getElementById('faceUpscaleCheck').checked);
+
+            processBtn.disabled = true;
+            progress.style.display = 'block';
+            results.style.display = 'none';
+            error.style.display = 'none';
+
+            let progressWidth = 0;
+            const progressInterval = setInterval(() => {
+                progressWidth += 1;
+                if (progressWidth <= 90) {
+                    progressFill.style.width = progressWidth + '%';
+                }
+            }, 200);
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                clearInterval(progressInterval);
+                progressFill.style.width = '100%';
+
+                const data = await response.json();
+
+                if (data.success) {
+                    resultId = data.result_id;
+                    originalImg.src = URL.createObjectURL(selectedFile);
+                    resultImg.src = `/result/${data.result_id}/${data.filename}`;
+                    downloadBtn.href = `/result/${data.result_id}/${data.filename}`;
+                    downloadBtn.download = `enhanced_${data.filename}`;
+                    
+                    setTimeout(() => {
+                        progress.style.display = 'none';
+                        results.style.display = 'block';
+                        processBtn.disabled = false;
+                    }, 500);
+                } else {
+                    throw new Error(data.error || 'Processing failed');
+                }
+            } catch (err) {
+                clearInterval(progressInterval);
+                progress.style.display = 'none';
+                error.textContent = '❌ Error: ' + err.message;
+                error.style.display = 'block';
+                processBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>
