@@ -15,3 +15,8 @@ tqdm
 yapf
 lpips
 gdown
+flask
+flask_cors
+Werkzeug
+pytest-shutil
+uuid
